@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Etiquetas - Gamarra v5.4</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
+    <style>
+        :root { --primary: #2c3e50; --bg: #f4f7f6; --accent: #3498db; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+        .main-wrapper { display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 1400px; }
+        @media (min-width: 1000px) { .main-wrapper { flex-direction: row; align-items: flex-start; } }
+
+        /* Panel Lateral */
+        .admin-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); flex: 1; max-width: 500px; max-height: 95vh; overflow-y: auto;}
+        h2 { color: var(--primary); text-align: center; margin-bottom: 20px; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+
+        .step-box { background: #fff5eb; border: 1px solid #f39c12; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .step-title { font-weight: bold; color: #d35400; margin-bottom: 10px; display: block; }
+        
+        .pdf-upload-zone { border: 2px dashed var(--accent); background: #ebf5fb; padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 10px; display: block; }
+        .copy-btn { background: var(--accent); color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; margin-bottom: 10px; display: none; }
+        .paste-zone { background: #e8f8f5; border: 1px solid #27ae60; padding: 15px; border-radius: 8px; }
+        
+        .global-settings { background: #f0f3f4; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #d5dbdb; }
+        
+        /* Bloque de cada receta */
+        .recipe-editor { background: #fff; border: 2px solid #eee; padding: 15px; border-radius: 10px; margin-bottom: 20px; position: relative; }
+        .recipe-editor h4 { margin: 0 0 10px 0; color: var(--accent); }
+
+        .local-dates { display: flex; gap: 10px; background: #f9f9f9; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #eee; }
+        .local-dates div { flex: 1; }
+
+        input, textarea { width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 13px; }
+        label { font-weight: bold; font-size: 0.75rem; color: #555; }
+        
+        .allergen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 5px; }
+        .allergen-item { background: #f9f9f9; padding: 4px; border-radius: 4px; border: 1px solid #eee; display: flex; align-items: center; gap: 5px; font-size: 0.7rem; }
+
+        .print-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 18px; margin-top: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
+
+        /* ETIQUETAS */
+        .labels-container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: flex-start; flex: 2; }
+        .label-pair { display: flex; gap: 15px; margin-bottom: 30px; background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #ddd; }
+
+        .label-preview { width: 62mm; height: 100mm; background: white; border: 1px solid #000; padding: 2mm 2mm 3.5mm 2mm; box-sizing: border-box; display: flex; flex-direction: column; position: relative; overflow: hidden; color: black; }
+        
+        .label-header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 1mm; margin-bottom: 1mm; }
+        .product-name { text-align: center; font-weight: 900; font-size: 10pt; margin-bottom: 1mm; text-transform: uppercase; display: flex; align-items: center; justify-content: center; min-height: 35px; line-height: 1.1;}
+        .section-title { font-weight: bold; font-size: 6.5pt; border-bottom: 1px solid #000; margin-bottom: 1mm; text-transform: uppercase; background: #eee; padding-left: 1mm; }
+        
+        /* TEXTOS MÁS GRANDES Y LEGIBLES (8pt) */
+        .reg-text { font-size: 8pt; line-height: 1.25; margin-bottom: 2mm; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; flex-grow: 1; font-style: italic; width: 100%; }
+        .ing-text { font-size: 8pt; line-height: 1.25; flex-grow: 1; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; width: 100%; }
+
+        .dates-box { display: flex; justify-content: space-between; font-size: 7pt; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 1mm 0; margin-bottom: 1mm; font-family: monospace; font-weight: bold; }
+        .allergens-icons-wrapper { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.5mm; margin: 1mm 0; padding: 0 1mm; }
+        .allergen-icon { width: 8.5mm; height: 8.5mm; border: 0.5px solid #ccc; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 11pt; position: relative; color: #ccc;}
+        .allergen-icon.active { color: #000; border-color: #000; }
+        .allergen-icon.active::after { content: '✕'; position: absolute; font-size: 14pt; color: red; font-weight: bold; }
+        
+        .label-footer { margin-top: auto; display: flex; align-items: center; gap: 10px; border-top: 1px solid #000; padding-top: 2mm; margin-bottom: 0.5mm; }
+        
+        .nutrition-table { width: 100%; border-collapse: collapse; font-size: 6.5pt; margin-top: 1mm; }
+        .nutrition-table th, .nutrition-table td { border: 1px solid #000; padding: 0.8mm; text-align: left; }
+
+        /* MAGIA PARA EL PDF */
+        @media print {
+            @page {
+                size: 62mm 100mm;
+                margin: 0mm;
+            }
+            body { background: white; margin: 0; padding: 0; }
+            .admin-panel { display: none !important; }
+            
+            .labels-container { display: block; margin: 0; padding: 0; gap: 0; }
+            .label-pair { border: none; padding: 0; margin: 0; display: block; box-shadow: none; }
+            
+            .label-preview { 
+                width: 62mm; 
+                height: 100mm; 
+                border: none; 
+                margin: 0; 
+                padding: 2mm 2mm 3.5mm 2mm; 
+                box-shadow: none;
+                page-break-after: always;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-wrapper">
+    <div class="admin-panel">
+        <h2>Generador de Etiquetas</h2>
+        
+        <div class="step-box">
+            <span class="step-title">1. Carga el PDF</span>
+            <label for="pdf-file" class="pdf-upload-zone">
+                <p>📂 SELECCIONAR ARCHIVO</p>
+                <input type="file" id="pdf-file" accept="application/pdf" onchange="processPDF(event)">
+            </label>
+            <button id="copy-text-btn" class="copy-btn" onclick="copyPrompt()">📋 COPIAR DATOS PARA IA</button>
+        </div>
+
+        <div class="step-box paste-zone">
+            <span class="step-title">2. Pega la respuesta</span>
+            <textarea id="ai-paste" rows="3" placeholder="Pega el código JSON aquí..." oninput="parseAIResponse()"></textarea>
+        </div>
+
+        <div class="global-settings">
+            <label>📅 Producción Lote</label>
+            <input type="date" id="global-prod" onchange="syncGlobalDates()">
+            <label>📅 Caducidad Lote</label>
+            <input type="date" id="global-cad" onchange="syncGlobalDates()">
+            <label>🔗 URL QR</label>
+            <input type="text" id="global-qr" value="https://gamarra.eus" oninput="updateAllQRs()">
+        </div>
+
+        <div id="dynamic-forms-container"></div>
+
+        <button class="print-btn" onclick="window.print()">🖨️ GENERAR / IMPRIMIR</button>
+    </div>
+
+    <div class="labels-container" id="dynamic-labels-container"></div>
+</div>
+
+<script>
+    const alergenosList = ["Gluten", "Crustáceos", "Huevos", "Pescado", "Cacahuete", "Soja", "Leche", "F.cáscara", "Apio", "Mostaza", "Sésamo", "Sulfitos", "Altramuces", "Moluscos"];
+    const iconos = ["🌾", "🦐", "🥚", "🐟", "🥜", "🫘", "🥛", "🌰", "🌱", "🌭", "🍪", "🧪", "🌼", "🐚"];
+    let rawPDFText = "";
+    let globalRecipes = [];
+    let qrCodes = [];
+
+    let d = new Date();
+    document.getElementById('global-prod').valueAsDate = d;
+    let d3 = new Date(); d3.setDate(d.getDate() + 3);
+    document.getElementById('global-cad').valueAsDate = d3;
+
+    function formatDate(val) {
+        if(!val) return "--/--/--";
+        const p = val.split("-");
+        return `${p[2]}/${p[1]}/${p[0]}`;
+    }
+
+    async function processPDF(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const typedarray = new Uint8Array(await file.arrayBuffer());
+        const pdf = await pdfjsLib.getDocument(typedarray).promise;
+        let text = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            text += content.items.map(item => item.str).join(" ") + " ";
+        }
+        rawPDFText = text;
+        document.getElementById('copy-text-btn').style.display = 'block';
+    }
+
+    function copyPrompt() {
+        const prompt = `Actúa como experto en nutrición. Analiza el texto y devuelve SOLO un ARRAY JSON [ ] con objetos por receta.
+IMPORTANTE: 
+1. En la lista de ingredientes, subraya los ingredientes que contengan alérgenos usando la etiqueta <u> (Ej: <u>harina</u>, <u>leche</u>).
+2. Pon las subelaboraciones en negrita (Ej: <b>Mousse:</b>).
+3. "plato", "ingredientes", "alergenos" (array), "nutricion" (array 6 valores).
+Texto: ${rawPDFText}`;
+        navigator.clipboard.writeText(prompt);
+        alert("¡Copiado! Pégalo en ChatGPT/Gemini.");
+    }
+
+    function parseAIResponse() {
+        try {
+            let val = document.getElementById('ai-paste').value.trim();
+            if (val.includes('```json')) val = val.replace(/```json/g, '').replace(/```/g, '').trim();
+            globalRecipes = JSON.parse(val.substring(val.indexOf('['), val.lastIndexOf(']') + 1));
+            buildUI();
+        } catch (e) { console.log("JSON no válido..."); }
+    }
+
+    function buildUI() {
+        const fCont = document.getElementById('dynamic-forms-container');
+        const lCont = document.getElementById('dynamic-labels-container');
+        fCont.innerHTML = ""; lCont.innerHTML = ""; qrCodes = [];
+
+        globalRecipes.forEach((rec, idx) => {
+            let algs = "";
+            alergenosList.forEach((a, i) => {
+                let chk = rec.alergenos && rec.alergenos.includes(a) ? "checked" : "";
+                algs += `<label class="allergen-item"><input type="checkbox" id="alg-${idx}-${i}" onchange="update(${idx})" ${chk}> ${iconos[i]} ${a}</label>`;
+            });
+
+            fCont.innerHTML += `
+                <div class="recipe-editor">
+                    <h4>${rec.plato}</h4>
+                    <div class="local-dates">
+                        <div><label>Elab.</label><input type="date" id="in-prod-${idx}" onchange="update(${idx})"></div>
+                        <div><label>Cad.</label><input type="date" id="in-cad-${idx}" onchange="update(${idx})"></div>
+                    </div>
+                    <label>Nombre</label><input type="text" id="in-plato-${idx}" value="${rec.plato}" oninput="update(${idx})">
+                    <label>Instrucciones (Vacío = ocultar)</label>
+                    <textarea id="in-reg-${idx}" rows="2" placeholder="Si no escribes nada, no aparecerá en la etiqueta" oninput="update(${idx})"></textarea>
+                    <label>Ingredientes</label>
+                    <textarea id="in-ing-${idx}" rows="3" oninput="update(${idx})">${rec.ingredientes}</textarea>
+                    <div class="allergen-grid">${algs}</div>
+                </div>`;
+
+            document.getElementById(`in-prod-${idx}`).value = document.getElementById('global-prod').value;
+            document.getElementById(`in-cad-${idx}`).value = document.getElementById('global-cad').value;
+
+            let ics = "";
+            alergenosList.forEach((a, i) => {
+                let act = rec.alergenos && rec.alergenos.includes(a) ? "active" : "";
+                ics += `<div class="allergen-icon ${act}" id="icon-${idx}-${i}">${iconos[i]}</div>`;
+            });
+
+            let n = rec.nutricion || ["-","-","-","-","-","-"];
+            lCont.innerHTML += `
+                <div class="label-pair">
+                    <div class="label-preview">
+                        <div class="label-header"><img src="logo.png" style="max-height:8mm" onerror="this.style.opacity='0'"></div>
+                        <div class="product-name" id="out-plato-${idx}">${rec.plato.toUpperCase()}</div>
+                        <div id="section-regen-${idx}">
+                            <div class="section-title">Instrucciones de uso</div>
+                            <div class="reg-text" id="out-reg-${idx}"></div>
+                        </div>
+                        <div class="dates-box">
+                            <span>ELAB: <span id="out-prod-${idx}">--</span></span>
+                            <span>CAD: <span id="out-cad-${idx}">--</span></span>
+                        </div>
+                        <div class="section-title">Alérgenos</div>
+                        <div class="allergens-icons-wrapper">${ics}</div>
+                        <div class="label-footer"><div id="qr-${idx}"></div><div style="font-size:5.5pt; line-height:1.2;">RECETA COMPLETA<br>EN EL QR</div></div>
+                    </div>
+                    <div class="label-preview">
+                        <div class="section-title" style="margin-top:2mm">Ingredientes</div>
+                        <div class="ing-text" id="out-ing-${idx}">${rec.ingredientes}</div>
+                        <div class="section-title">Nutrición (100g)</div>
+                        <table class="nutrition-table">
+                            <tr><th>Valor Energético</th><td>${n[0]}</td></tr>
+                            <tr><th>Grasas</th><td>${n[1]}</td></tr>
+                            <tr><th>H. Carbono</th><td>${n[2]}</td></tr>
+                            <tr><th>Azúcares</th><td>${n[3]}</td></tr>
+                            <tr><th>Proteínas</th><td>${n[4]}</td></tr>
+                            <tr><th>Sal</th><td>${n[5]}</td></tr>
+                        </table>
+                    </div>
+                </div>`;
+            update(idx);
+        });
+
+        setTimeout(() => {
+            let url = document.getElementById('global-qr').value;
+            globalRecipes.forEach((_, i) => {
+                qrCodes[i] = new QRCode(document.getElementById(`qr-${i}`), { text: url, width: 48, height: 48 });
+            });
+        }, 100);
+    }
+
+    function update(idx) {
+        document.getElementById(`out-plato-${idx}`).innerText = document.getElementById(`in-plato-${idx}`).value.toUpperCase();
+        document.getElementById(`out-ing-${idx}`).innerHTML = document.getElementById(`in-ing-${idx}`).value;
+        
+        let regText = document.getElementById(`in-reg-${idx}`).value;
+        let regSection = document.getElementById(`section-regen-${idx}`);
+        if(regText.trim() === "") {
+            regSection.style.display = "none";
+        } else {
+            regSection.style.display = "block";
+            document.getElementById(`out-reg-${idx}`).innerText = regText;
+        }
+
+        document.getElementById(`out-prod-${idx}`).innerText = formatDate(document.getElementById(`in-prod-${idx}`).value);
+        document.getElementById(`out-cad-${idx}`).innerText = formatDate(document.getElementById(`in-cad-${idx}`).value);
+
+        alergenosList.forEach((a, i) => {
+            let check = document.getElementById(`alg-${idx}-${i}`).checked;
+            document.getElementById(`icon-${idx}-${i}`).className = "allergen-icon" + (check ? " active" : "");
+        });
+    }
+
+    function syncGlobalDates() {
+        let gp = document.getElementById('global-prod').value;
+        let gc = document.getElementById('global-cad').value;
+        globalRecipes.forEach((_, i) => {
+            document.getElementById(`in-prod-${i}`).value = gp;
+            document.getElementById(`in-cad-${i}`).value = gc;
+            update(i);
+        });
+    }
+
+    function updateAllQRs() {
+        let url = document.getElementById('global-qr').value;
+        qrCodes.forEach(q => { q.clear(); q.makeCode(url); });
+    }
+</script>
+</body>
+</html>
